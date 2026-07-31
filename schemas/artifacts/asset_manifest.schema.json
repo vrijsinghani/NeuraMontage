@@ -34,6 +34,28 @@
           "provider": { "type": "string", "description": "Provider name (e.g. pixabay, google_imagen)" },
           "license": { "type": "string", "description": "License type (e.g. Pixabay License, CC0)" },
           "original_url": { "type": "string", "description": "Source URL if downloaded from a stock service" },
+          "approval": {
+            "type": "object",
+            "description": "Operator approval provenance. Motion generation may only run against an asset whose state is 'approved'; a rejected asset is moved to quarantine_path rather than deleted or overwritten.",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": ["pending", "approved", "rejected"]
+              },
+              "approved_by": { "type": "string" },
+              "approved_at": { "type": "string" },
+              "review_notes": { "type": "string" },
+              "quarantine_path": {
+                "type": "string",
+                "description": "Relative path the rejected asset was moved to, within the project directory"
+              },
+              "supersedes": {
+                "type": "string",
+                "description": "id of the rejected asset this asset replaces"
+              }
+            },
+            "additionalProperties": false
+          },
           "voice_performance": {
             "type": "object",
             "description": "Applied voice-performance contract for narration assets.",

@@ -17,6 +17,23 @@ Every scene entry carries:
 - materials and finishes appropriate to *this* state,
 - caption safe zone: where text will sit, and what must stay clear of it.
 
+## Shot Framing (R5 — Binding Craft)
+
+Close on the person or the work for process shots. Wide full-room plates are
+for before/after reveals only.
+
+When writing each shot's camera framing:
+
+- **Process / install / detail beats** — medium or tight on the worker and the
+  material being acted on. The room may appear as context, but the frame's job
+  is the credible action, not a tour of the space.
+- **Before and after reveals** — wide plates that show the full room. Do not
+  use a wide establishing frame for a process beat "because it looks nicer."
+
+This rule lives here and in `stills-director.md`. It also lives in
+`docs/AI_VIDEO_PRODUCTION_RUNBOOK.md` §1. Violating it is the usual path to
+physically unbelievable motion later.
+
 ## One Action Per Shot
 
 A shot that contains two actions cannot be generated as motion from a single

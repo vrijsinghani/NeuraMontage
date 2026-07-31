@@ -31,6 +31,9 @@ Self-QC every still before showing it. All seven must pass:
    approximation of it.
 4. **Action believability** — the body is doing the action, not posing near it.
 5. **Framing** — matches the scene spec, and the caption safe zone is clear.
+   Process stills must be close on the person/work; reject wide full-room
+   process plates (wide is for before/after reveals only — see scene-director
+   Shot Framing / R5 and `docs/AI_VIDEO_PRODUCTION_RUNBOOK.md` §1).
 6. **Material match** — finishes belong to *this* narrative state.
 7. **No fake construction geometry** — no invented structural elements, no walls
    that could not exist, no floating fixtures.

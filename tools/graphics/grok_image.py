@@ -23,6 +23,13 @@ from tools.base_tool import (
     ToolTier,
 )
 
+# Preferred for hard spatial room edits (AI_VIDEO_PRODUCTION_RUNBOOK.md §11.1).
+# `grok-imagine-image` stays selectable: the quality tier is not enabled on
+# every xAI account. Single source of truth for the schema default and the
+# `_build_payload` fallback so the two cannot drift.
+_DEFAULT_MODEL = "grok-imagine-image-quality"
+_SUPPORTED_MODELS = [_DEFAULT_MODEL, "grok-imagine-image"]
+
 
 def _file_to_data_uri(path_str: str) -> str:
     path = Path(path_str)
@@ -96,8 +103,13 @@ class GrokImage(BaseTool):
             },
             "model": {
                 "type": "string",
-                "enum": ["grok-imagine-image"],
-                "default": "grok-imagine-image",
+                "enum": _SUPPORTED_MODELS,
+                "default": _DEFAULT_MODEL,
+                "description": (
+                    "grok-imagine-image-quality is the proven path for hard "
+                    "spatial room edits; fall back to grok-imagine-image if the "
+                    "quality tier is not enabled on the account."
+                ),
             },
             "aspect_ratio": {"type": "string", "description": "Examples: 1:1, 3:2, 16:9, 9:16"},
             "resolution": {
@@ -159,7 +171,7 @@ class GrokImage(BaseTool):
     def _build_payload(self, inputs: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         mode = inputs.get("generation_mode", "generate")
         payload: dict[str, Any] = {
-            "model": inputs.get("model", "grok-imagine-image"),
+            "model": inputs.get("model", _DEFAULT_MODEL),
             "prompt": inputs["prompt"],
         }
         if inputs.get("aspect_ratio"):

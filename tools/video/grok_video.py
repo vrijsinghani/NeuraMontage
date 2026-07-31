@@ -26,6 +26,13 @@ from tools.base_tool import (
     ToolTier,
 )
 
+# Preferred for image-to-video off an approved still
+# (AI_VIDEO_PRODUCTION_RUNBOOK.md §12.1). `grok-imagine-video` stays selectable
+# for broader reference-to-video needs. Single source of truth for the schema
+# default and the `_build_payload` fallback so the two cannot drift.
+_DEFAULT_MODEL = "grok-imagine-video-1.5"
+_SUPPORTED_MODELS = [_DEFAULT_MODEL, "grok-imagine-video"]
+
 
 def _file_to_data_uri(path_str: str) -> str:
     path = Path(path_str)
@@ -101,8 +108,12 @@ class GrokVideo(BaseTool):
             },
             "model": {
                 "type": "string",
-                "enum": ["grok-imagine-video"],
-                "default": "grok-imagine-video",
+                "enum": _SUPPORTED_MODELS,
+                "default": _DEFAULT_MODEL,
+                "description": (
+                    "grok-imagine-video-1.5 is the proven image-to-video path; "
+                    "grok-imagine-video covers broader reference-to-video needs."
+                ),
             },
             "duration": {
                 "type": "integer",
@@ -182,7 +193,7 @@ class GrokVideo(BaseTool):
     def _build_payload(self, inputs: dict[str, Any]) -> dict[str, Any]:
         operation = inputs.get("operation", "text_to_video")
         payload: dict[str, Any] = {
-            "model": inputs.get("model", "grok-imagine-video"),
+            "model": inputs.get("model", _DEFAULT_MODEL),
             "prompt": inputs["prompt"],
         }
 

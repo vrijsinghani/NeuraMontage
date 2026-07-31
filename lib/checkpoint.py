@@ -34,6 +34,12 @@ CANONICAL_STAGE_ARTIFACTS = {
     "script": "script",
     "scene_plan": "scene_plan",
     "assets": "asset_manifest",
+    # `stills` and `motion` split the `assets` stage for pipelines that must
+    # approve every still before spending motion credits. They are manifest
+    # stages (not in ALL_KNOWN_STAGES) but need the canonical artifact so the
+    # gate cannot be satisfied by an empty checkpoint.
+    "stills": "asset_manifest",
+    "motion": "asset_manifest",
     "edit": "edit_decisions",
     "compose": "render_report",
     "publish": "publish_log",

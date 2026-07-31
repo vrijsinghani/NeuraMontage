@@ -1,4 +1,4 @@
-"""Regression tests: SRT/VTT timestamp formatting must not overflow milliseconds.
+"""Regression tests: SRT/VTT/ASS timestamp formatting must not overflow sub-seconds.
 
 `_ts_srt` / `_ts_vtt` computed the seconds and millisecond fields independently:
 `ms = int(round((seconds % 1) * 1000))`. When the fractional part is >= 0.9995,
@@ -6,6 +6,11 @@ that rounds to 1000, emitting a malformed 4-digit `…,1000` with no carry into
 the seconds (and, at boundaries, minutes/hours) field — e.g. 0.9999s ->
 `00:00:00,1000` instead of `00:00:01,000`. Such timestamps are rejected by
 strict SRT/VTT parsers (ffmpeg subtitles filter, VLC, browser WebVTT).
+
+ASS has the same class of bug at centisecond precision: splitting fields first
+and only bumping `secs` when `centis == 100` leaves `0:00:60.00` at the minute
+boundary. `ass_timestamp` must round to total centiseconds first, matching
+`SubtitleGen._hmsms`.
 """
 
 import re
@@ -15,10 +20,12 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from tools.subtitle._ass import ass_timestamp  # noqa: E402
 from tools.subtitle.subtitle_gen import SubtitleGen  # noqa: E402
 
 _SRT_RE = re.compile(r"^\d{2}:\d{2}:\d{2},\d{3}$")
 _VTT_RE = re.compile(r"^\d{2}:\d{2}:\d{2}\.\d{3}$")
+_ASS_RE = re.compile(r"^\d+:\d{2}:\d{2}\.\d{2}$")
 
 
 def test_millisecond_carry_does_not_overflow():
@@ -47,3 +54,21 @@ def test_all_outputs_are_well_formed():
     for t in (0.0, 0.4995, 0.9995, 0.9999, 1.0, 59.9995, 3599.9999, 12345.9999):
         assert _SRT_RE.match(SubtitleGen._ts_srt(t)), SubtitleGen._ts_srt(t)
         assert _VTT_RE.match(SubtitleGen._ts_vtt(t)), SubtitleGen._ts_vtt(t)
+        assert _ASS_RE.match(ass_timestamp(t)), ass_timestamp(t)
+
+
+def test_ass_centisecond_carry_does_not_overflow():
+    assert ass_timestamp(0.995) == "0:00:01.00"
+    assert ass_timestamp(1.995) == "0:00:02.00"
+
+
+def test_ass_carry_propagates_across_minute_and_hour_boundaries():
+    assert ass_timestamp(59.995) == "0:01:00.00"
+    assert ass_timestamp(3599.995) == "1:00:00.00"
+    assert ass_timestamp(7261.995) == "2:01:02.00"
+
+
+def test_ass_normal_values_unchanged():
+    assert ass_timestamp(0.0) == "0:00:00.00"
+    assert ass_timestamp(1.5) == "0:00:01.50"
+    assert ass_timestamp(83.25) == "0:01:23.25"

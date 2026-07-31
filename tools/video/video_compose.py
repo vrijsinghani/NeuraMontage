@@ -139,6 +139,17 @@ class VideoCompose(BaseTool):
                     "transcript_comparison when a file path is unavailable."
                 ),
             },
+            "finish_stack": {
+                "type": "object",
+                "description": (
+                    "Client-ready finish mux for the ffmpeg runtime: persistent "
+                    "logo overlay, burned ASS captions, VO + music mix, post-VO "
+                    "end card, and -14 LUFS loudness. Keys: video_path, vo_path, "
+                    "music_path, logo_path, ass_path, vo_end, card_duration, "
+                    "base_duration. Final duration is vo_end + card_duration; "
+                    "`-shortest` is never used because it drops the end card."
+                ),
+            },
             "subtitle_path": {"type": "string"},
             "subtitle_style": {
                 "type": "object",
@@ -1622,9 +1633,27 @@ class VideoCompose(BaseTool):
         """Explicit FFmpeg-only render path.
 
         Use when the proposal locked `render_runtime="ffmpeg"` — e.g. simple
-        source-footage concat/trim jobs that don't benefit from composition.
-        Still runs the mandatory final self-review.
+        source-footage concat/trim jobs, or a short-form ad finished with the
+        `finish_stack` mux. Still runs the mandatory final self-review.
         """
+        from tools.video._finish_stack import FinishStackError, validate_unique_clips
+
+        # R7 is checked before any encode: repeating, freezing, or slowing a
+        # clip to pad runtime is a rejection, not a warning.
+        try:
+            validate_unique_clips(resolved_cuts)
+        except FinishStackError as exc:
+            return ToolResult(success=False, error=str(exc))
+
+        finish_stack = inputs.get("finish_stack")
+        if finish_stack:
+            return self._render_finish_stack(
+                finish_stack=finish_stack,
+                inputs=inputs,
+                edit_decisions=edit_decisions,
+                output_path=output_path,
+            )
+
         options = inputs.get("options", {})
         subtitle_burn = options.get("subtitle_burn", True)
 
@@ -1669,6 +1698,64 @@ class VideoCompose(BaseTool):
                 )
 
         return render_result
+
+    def _render_finish_stack(
+        self,
+        *,
+        finish_stack: dict[str, Any],
+        inputs: dict[str, Any],
+        edit_decisions: dict[str, Any],
+        output_path: Path,
+    ) -> ToolResult:
+        """Render the client-ready mux, then run the mandatory self-review."""
+        from tools.video._finish_stack import (
+            FinishStackError,
+            FinishStackSpec,
+            build_finish_command,
+            final_duration,
+        )
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            spec = FinishStackSpec(output_path=str(output_path), **finish_stack)
+            cmd = build_finish_command(spec)
+        except (FinishStackError, TypeError) as exc:
+            return ToolResult(success=False, error=f"finish_stack: {exc}")
+
+        self.run_command(cmd)
+
+        if not output_path.exists():
+            return ToolResult(success=False, error="finish_stack produced no output file")
+
+        final_review = self._run_final_review(
+            output_path,
+            edit_decisions,
+            inputs.get("proposal_packet"),
+            narration_transcript_path=inputs.get("narration_transcript_path"),
+            script_text=inputs.get("script_text")
+            or self._read_text_file(inputs.get("script_path")),
+        )
+        data = {
+            "operation": "render",
+            "render_runtime": "ffmpeg",
+            "finish_stack": True,
+            "final_duration": final_duration(spec.vo_end, spec.card_duration),
+            "output": str(output_path),
+            "final_review": final_review,
+            "final_review_status": final_review["status"],
+        }
+        if final_review["status"] == "fail":
+            return ToolResult(
+                success=False,
+                error=(
+                    "Post-render self-review FAILED (finish stack). The output is "
+                    "not presentable.\n"
+                    + "\n".join(f"  • {i}" for i in final_review.get("issues_found", []))
+                ),
+                data=data,
+            )
+
+        return ToolResult(success=True, data=data, artifacts=[str(output_path)])
 
     def _remotion_render(self, inputs: dict[str, Any]) -> ToolResult:
         """Render via Remotion (requires Node.js + npx).

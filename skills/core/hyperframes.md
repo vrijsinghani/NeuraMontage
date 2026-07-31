@@ -448,6 +448,7 @@ the `deterministicFonts.ts` mapping table. Safe bets: `Outfit`,
 | `talking-head` | Deferred — depends on TalkingHead parity |
 | `avatar-spokesperson` | Deferred — depends on TalkingHead parity |
 | `clip-factory`, `podcast-repurpose`, `localization-dub` | Deferred — current compose paths rely on Remotion caption burn |
+| `transformation-ad` | Deferred — caption-burn parity with the ASS kinetic engine is unestablished, and captions are load-bearing for a sound-off ad. Default runtime is `ffmpeg`; the proposal-director still presents HyperFrames and records it as rejected |
 | `framework-smoke` | N/A (test pipeline) |
 
 Proposal and compose directors for adopted pipelines describe runtime choice

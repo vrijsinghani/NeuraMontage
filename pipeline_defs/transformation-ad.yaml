@@ -1,0 +1,314 @@
+name: transformation-ad
+version: "0.1"
+description: >
+  Short-form before/after transformation ads built from generated stills and
+  image-to-video motion. The canonical assets stage is split into two gated
+  stages, stills and motion, so every plate is approved by a human before any
+  motion credits are spent. Finishes as a single ffmpeg mux: burned kinetic
+  captions, persistent logo, VO plus ducked music, post-VO end card, and
+  loudness normalisation.
+category: custom
+stability: beta
+default_checkpoint_policy: guided
+
+reference_input:
+  supported: true
+  analysis_depth: deep
+  analysis_tools:
+    - video_analyzer
+    - transcript_fetcher
+    - video_downloader
+    - scene_detect
+    - frame_sampler
+
+extensions:
+  custom_scripts: true
+  custom_playbooks: true
+  custom_skills: true
+  custom_tools: false
+
+required_skills:
+  - pipelines/transformation-ad/executive-producer
+  - pipelines/transformation-ad/research-director
+  - pipelines/transformation-ad/proposal-director
+  - pipelines/transformation-ad/idea-director
+  - pipelines/transformation-ad/script-director
+  - pipelines/transformation-ad/scene-director
+  - pipelines/transformation-ad/stills-director
+  - pipelines/transformation-ad/motion-director
+  - pipelines/transformation-ad/edit-director
+  - pipelines/transformation-ad/compose-director
+  - pipelines/transformation-ad/publish-director
+  - meta/reviewer
+  - meta/checkpoint-protocol
+
+orchestration:
+  mode: executive-producer
+  skill: pipelines/transformation-ad/executive-producer
+  budget_default_usd: 3.00
+  max_revisions_per_stage: 3
+  max_send_backs: 3
+  max_wall_time_minutes: 25
+
+compatible_playbooks:
+  recommended:
+    - clean-professional
+  also_works:
+    - flat-motion-graphics
+  custom_allowed: true
+
+stages:
+  - name: research
+    skill: pipelines/transformation-ad/research-director
+    produces:
+      - research_brief
+      - video_analysis_brief
+    optional_tools:
+      - video_downloader
+      - video_analyzer
+      - transcript_fetcher
+      - scene_detect
+      - frame_sampler
+    tools_available:
+      - video_downloader
+      - video_analyzer
+      - transcript_fetcher
+      - scene_detect
+      - frame_sampler
+    checkpoint_required: false
+    human_approval_default: false
+    review_focus:
+      - Reference structure is analysed rather than transcribed shot for shot
+      - At least three comparable examples with the mechanic that makes each work
+      - Feasibility notes separate what generated stills and image-to-video can do from what they cannot
+    success_criteria:
+      - Schema-valid research_brief
+      - When a reference exists, a video_analysis_brief records pacing, payoff placement, caption behaviour, and audio architecture
+
+  - name: proposal
+    skill: pipelines/transformation-ad/proposal-director
+    required_artifacts_in:
+      - research_brief
+    optional_artifacts_in:
+      - video_analysis_brief
+    produces:
+      - proposal_packet
+      - decision_log
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Two to three concepts that differ in mechanic, not in wording
+      - No concept reproduces the reference shot list or narration
+      - All three render runtimes are presented, with a render_runtime_selection decision recording both rejected options and reasons
+      - Motion clip count and cost are stated honestly against the budget
+    success_criteria:
+      - Schema-valid proposal_packet
+      - decision_log carries a render_runtime_selection entry with more than one option considered
+      - Human approval is recorded before any asset generation
+
+  - name: idea
+    skill: pipelines/transformation-ad/idea-director
+    required_artifacts_in:
+      - proposal_packet
+    produces:
+      - brief
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Opening state and payoff state are specified down to materials and fixtures
+      - Persistent anchors are enumerated so later stages can check continuity
+      - The narrative-state rule is written into the brief, not assumed
+    success_criteria:
+      - Schema-valid brief
+      - Brief carries the selected render_runtime, runtime target, and deliverable definition
+
+  - name: script
+    skill: pipelines/transformation-ad/script-director
+    required_artifacts_in:
+      - brief
+    produces:
+      - script
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Each beat carries its on-screen phrase and its optional narration line
+      - The on-screen phrase carries the meaning with the sound off
+      - Brand tokens appear exactly as written in the brief
+      - No narration line spans a beat boundary
+    success_criteria:
+      - Schema-valid script
+      - Beat count and beat boundaries are explicit enough for caption alignment
+
+  - name: scene_plan
+    skill: pipelines/transformation-ad/scene-director
+    required_artifacts_in:
+      - script
+    optional_artifacts_in:
+      - brief
+    produces:
+      - scene_plan
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Exactly one action per shot
+      - State progression is monotonic; no later-state material appears in an earlier shot
+      - Persistent anchors are listed per shot, including when out of frame
+      - The text safe zone is reserved in the shot spec, not deferred to compose
+    success_criteria:
+      - Schema-valid scene_plan
+      - Planned still count is reconciled against the approved budget
+
+  - name: stills
+    skill: pipelines/transformation-ad/stills-director
+    required_artifacts_in:
+      - scene_plan
+    optional_artifacts_in:
+      - brief
+    produces:
+      - asset_manifest
+    required_tools:
+      - grok_image
+    optional_tools:
+      - image_selector
+    tools_available:
+      - grok_image
+      - image_selector
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Every candidate passes the seven-point still check before it is shown
+      - Anchors, scale, and branding hold across the whole set
+      - Materials belong to the shot's narrative state
+      - Rejects are quarantined with a recorded approval state, never deleted or overwritten
+    success_criteria:
+      - Schema-valid asset_manifest with one still per planned shot
+      - Every still carries an approval object, and every approved still has approval.state == "approved"
+      - Human approval is recorded before the stage completes
+
+  - name: motion
+    skill: pipelines/transformation-ad/motion-director
+    required_artifacts_in:
+      - asset_manifest
+      - scene_plan
+    produces:
+      - asset_manifest
+    required_tools:
+      - grok_video
+    optional_tools:
+      - veo_video
+    tools_available:
+      - grok_video
+      - veo_video
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Every source still was approved at the previous gate
+      - Each clip is a unique action; nothing is repeated, frozen, looped, or slowed
+      - Clips were judged by watching the file at normal speed, not from contact strips
+      - Any provider escalation is recorded as a decision with its reason
+    success_criteria:
+      - Schema-valid asset_manifest with one clip per approved still
+      - decision_log records any provider escalation
+      - Human approval is recorded before the stage completes
+
+  - name: edit
+    skill: pipelines/transformation-ad/edit-director
+    required_artifacts_in:
+      - asset_manifest
+      - scene_plan
+    optional_artifacts_in:
+      - script
+    produces:
+      - edit_decisions
+    tools_available:
+      - video_trimmer
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Chronological assembly with each action appearing exactly once
+      - No clip path appears twice in the cut list
+      - render_runtime is carried forward from the approved decision, not re-decided
+      - vo_end and card_duration are set so compose never needs -shortest
+    success_criteria:
+      - Schema-valid edit_decisions
+      - edit_decisions carries render_runtime, base_duration, vo_end, and card_duration
+    sub_stages:
+      - name: clean_cut
+        description: "Picture-only assembly with no narration or captions, judged for visual arc"
+        condition: "approved_motion_assets_exist"
+        human_approval_default: false
+        tools_available:
+          - video_trimmer
+          - video_compose
+        review_focus:
+          - The transformation reads without narration
+          - The payoff lands with runtime left to hold on it
+      - name: vo_align
+        description: "Narration laid against the clean cut and aligned to beat boundaries"
+        condition: "clean_cut_exists"
+        human_approval_default: false
+        tools_available:
+          - audio_mixer
+          - transcriber
+        review_focus:
+          - Each narration line sits inside its beat
+          - The cut moved to fit the narration rather than the narration being cut to fit picture
+
+  - name: compose
+    skill: pipelines/transformation-ad/compose-director
+    required_artifacts_in:
+      - edit_decisions
+      - asset_manifest
+    optional_artifacts_in:
+      - script
+    produces:
+      - render_report
+      - final_review
+    required_tools:
+      - video_compose
+      - kinetic_captions
+    optional_tools:
+      - audio_mixer
+      - audio_enhance
+      - color_grade
+    tools_available:
+      - video_compose
+      - kinetic_captions
+      - audio_mixer
+      - audio_enhance
+      - color_grade
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Rendered through the runtime recorded in edit_decisions, with no silent substitution
+      - Final duration equals vo_end plus card_duration and the end card survives to the last frame
+      - Captions are readable against every background they cross and brand tokens are intact
+      - The operator watched the file at normal speed before it was presented
+    success_criteria:
+      - Schema-valid render_report
+      - Output MP4 exists, passes ffprobe, and matches the planned duration
+      - Human approval is recorded before the stage completes
+
+  - name: publish
+    skill: pipelines/transformation-ad/publish-director
+    required_artifacts_in:
+      - render_report
+      - final_review
+    optional_artifacts_in:
+      - brief
+    produces:
+      - publish_log
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Export package carries the MP4, a payoff-state thumbnail, and caption text
+      - Metadata reuses the approved hook and call to action rather than inventing new copy
+      - Provenance records the asset ids in the final cut and the quarantined rejects
+    success_criteria:
+      - Schema-valid publish_log
+      - Export directory contains the deliverable and its metadata

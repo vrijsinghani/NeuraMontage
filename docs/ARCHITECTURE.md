@@ -215,6 +215,7 @@ stages:
 | `podcast-repurpose` | hybrid | Podcast highlights to video |
 | `screen-demo` | screen_recording | Software screen recordings and walkthroughs |
 | `talking-head` | talking_head | Footage-led speaker videos |
+| `transformation-ad` | custom | Home-services before/after transformation ads; `assets` is split into gated `stills` and `motion` stages |
 | `framework-smoke` | custom | Minimal smoke test for framework validation |
 
 ### Standard Stage Progression

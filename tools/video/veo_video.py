@@ -3,6 +3,12 @@
 Support text-to-video, image-to-video, reference-to-video, and first/last-frame
 interpolation so agents can preserve visual consistency instead of relying only on
 raw text prompts.
+
+Backend choice is not interchangeable. `model_variant` is enum-free because the
+two backends speak different dialects: the Google GenAI backend takes Google
+model ids (`veo-3.1-fast-generate-preview`), while fal takes fal-specific slugs
+and cannot express that model. The transformation-ad runbook's alternate motion
+path names a Google model id, so it requires `backend: "google"`.
 """
 
 from __future__ import annotations
@@ -28,6 +34,23 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+
+_DEFAULT_MODEL_VARIANT = "veo3.1"
+
+# Short aliases the tool accepts, mapped to Google GenAI model ids. Anything
+# outside these sets is passed through verbatim, which is how the runbook's
+# exact `veo-3.1-fast-generate-preview` reaches the API without a schema change.
+_GOOGLE_MODEL_ALIASES = {
+    "veo3": ("veo-3.1-generate-preview", "veo-3.1-generate-001"),
+    "veo3.1": ("veo-3.1-generate-preview", "veo-3.1-generate-001"),
+    "veo3/fast": ("veo-3.1-fast-generate-preview", "veo-3.1-fast-generate-001"),
+    "veo3.1/fast": ("veo-3.1-fast-generate-preview", "veo-3.1-fast-generate-001"),
+}
+
+
+def _is_fast_variant(model_variant: str) -> bool:
+    """True for both the `veo3.1/fast` alias and a verbatim fast model id."""
+    return "fast" in (model_variant or "")
 
 
 class VeoVideo(BaseTool):
@@ -202,16 +225,20 @@ class VeoVideo(BaseTool):
         except ValueError:
             duration = 8
 
+        variant = inputs.get("model_variant", _DEFAULT_MODEL_VARIANT)
+
         if backend == "google":
-            # Standard Google Veo is $0.40 per second
-            return round(duration * 0.40, 4)
+            # Google publishes Veo 3.1 at $0.40/sec and the fast tier at
+            # $0.15/sec. Quoting the standard rate for a fast variant
+            # misreports cost by ~2.7x.
+            per_second = 0.15 if _is_fast_variant(variant) else 0.40
+            return round(duration * per_second, 4)
 
         # FAL cost estimation
-        variant = inputs.get("model_variant", "veo3.1")
         resolution = inputs.get("resolution", "1080p")
         generate_audio = bool(inputs.get("generate_audio", True))
 
-        if "fast" in variant:
+        if _is_fast_variant(variant):
             base_per_second = 0.10
             audio_per_second = 0.20
         else:
@@ -230,13 +257,27 @@ class VeoVideo(BaseTool):
         if backend == "auto":
             backend = "google" if self._get_google_credentials_status() else "fal"
 
-        if backend == "google":
-            return 90.0
+        variant = inputs.get("model_variant", _DEFAULT_MODEL_VARIANT)
 
-        variant = inputs.get("model_variant", "veo3.1")
-        if "fast" in variant:
+        if backend == "google":
+            return 45.0 if _is_fast_variant(variant) else 90.0
+
+        if _is_fast_variant(variant):
             return 45.0
         return 120.0
+
+    @staticmethod
+    def resolve_google_model(model_variant: str, *, is_vertex: bool = False) -> str:
+        """Map a short alias to a Google GenAI model id.
+
+        Unrecognized values pass through verbatim so a caller can name an exact
+        model (e.g. the runbook's `veo-3.1-fast-generate-preview`) without a
+        schema change.
+        """
+        preview, vertex = _GOOGLE_MODEL_ALIASES.get(model_variant, (None, None))
+        if preview is None:
+            return model_variant
+        return vertex if is_vertex else preview
 
     @staticmethod
     def _file_to_data_uri(path_str: str) -> str:
@@ -317,17 +358,10 @@ class VeoVideo(BaseTool):
 
         prompt = inputs["prompt"]
         operation = inputs.get("operation", "text_to_video")
-        model_variant = inputs.get("model_variant", "veo3.1")
+        model_variant = inputs.get("model_variant", _DEFAULT_MODEL_VARIANT)
         auto_fix = inputs.get("auto_fix", True)
 
-        # Map to the official preview model unless a custom model name is provided
-        if model_variant in {"veo3", "veo3/fast", "veo3.1", "veo3.1/fast"}:
-            if is_vertex:
-                model_name = "veo-3.1-generate-001"
-            else:
-                model_name = "veo-3.1-generate-preview"
-        else:
-            model_name = model_variant
+        model_name = self.resolve_google_model(model_variant, is_vertex=is_vertex)
 
         duration_text = str(inputs.get("duration", "8s")).lower().replace("s", "")
         try:
@@ -550,7 +584,7 @@ class VeoVideo(BaseTool):
 
         start = time.time()
         operation = inputs.get("operation", "text_to_video")
-        variant = inputs.get("model_variant", "veo3.1")
+        variant = inputs.get("model_variant", _DEFAULT_MODEL_VARIANT)
         duration = inputs.get("duration", "8s")
 
         # Current fal Veo 3.1 image-guided endpoints only accept 8-second clips.

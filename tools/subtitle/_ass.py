@@ -15,18 +15,21 @@ def hex_to_ass_colour(value: str) -> str:
     if len(raw) != 6:
         return WHITE
     r, g, b = raw[0:2], raw[2:4], raw[4:6]
-    return f"&H00{b}{g}{r}&".upper().replace("&H00", "&H00", 1)
+    return f"&H00{b}{g}{r}&".upper()
 
 
 def ass_timestamp(seconds: float) -> str:
-    """Format seconds as ASS `H:MM:SS.cc`."""
-    seconds = max(0.0, seconds)
-    hours, rem = divmod(int(seconds), 3600)
-    minutes, secs = divmod(rem, 60)
-    centis = int(round((seconds - int(seconds)) * 100))
-    if centis == 100:  # rounding carried into the next second
-        centis = 0
-        secs += 1
+    """Format seconds as ASS `H:MM:SS.cc`.
+
+    Round to total centiseconds before splitting fields so a carry propagates
+    through seconds → minutes → hours (same shape as `SubtitleGen._hmsms`).
+    Splitting first and only bumping `secs` when `centis == 100` leaves
+    `0:00:60.00` at the minute boundary.
+    """
+    total_cc = int(round(max(0.0, seconds) * 100))
+    hours, rem = divmod(total_cc, 3600 * 100)
+    minutes, rem = divmod(rem, 60 * 100)
+    secs, centis = divmod(rem, 100)
     return f"{hours}:{minutes:02d}:{secs:02d}.{centis:02d}"
 
 

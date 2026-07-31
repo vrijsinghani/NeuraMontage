@@ -23,35 +23,41 @@ from tools.video._finish_stack import (
 )
 
 
-@pytest.fixture()
-def media(tmp_path):
-    """A tiny real video, VO, music, logo, and ASS so commands can be run."""
-    video = tmp_path / "video-only.mp4"
+@pytest.fixture(scope="module")
+def media(tmp_path_factory):
+    """A tiny real video, VO, music, logo, and ASS so commands can be run.
+
+    Module-scoped: every test in this file only reads these files (writes go
+    through the function-scoped `tmp_path`), so the 4 ffmpeg encodes run once
+    per module instead of once per test.
+    """
+    media_dir = tmp_path_factory.mktemp("media")
+    video = media_dir / "video-only.mp4"
     subprocess.run(
         ["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi",
          "-i", "testsrc=size=720x1280:rate=24:duration=6", "-c:v", "libx264",
          "-preset", "ultrafast", "-pix_fmt", "yuv420p", str(video)],
         check=True,
     )
-    vo = tmp_path / "vo.mp3"
+    vo = media_dir / "vo.mp3"
     subprocess.run(
         ["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi",
          "-i", "sine=frequency=220:duration=4", "-c:a", "libmp3lame", str(vo)],
         check=True,
     )
-    music = tmp_path / "music.mp3"
+    music = media_dir / "music.mp3"
     subprocess.run(
         ["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi",
          "-i", "sine=frequency=440:duration=8", "-c:a", "libmp3lame", str(music)],
         check=True,
     )
-    logo = tmp_path / "logo.png"
+    logo = media_dir / "logo.png"
     subprocess.run(
         ["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi",
          "-i", "color=c=white:s=200x60:d=1", "-frames:v", "1", str(logo)],
         check=True,
     )
-    ass = tmp_path / "captions.ass"
+    ass = media_dir / "captions.ass"
     ass.write_text(
         "[Script Info]\nScriptType: v4.00+\nPlayResX: 720\nPlayResY: 1280\n\n"
         "[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
@@ -134,9 +140,8 @@ def test_a_missing_vo_end_is_rejected(media, tmp_path):
 
 
 def test_the_ass_filter_receives_the_caption_engine_output(media, tmp_path):
-    graph = build_finish_command(_spec(media, tmp_path))[
-        build_finish_command(_spec(media, tmp_path)).index("-filter_complex") + 1
-    ]
+    cmd = build_finish_command(_spec(media, tmp_path))
+    graph = cmd[cmd.index("-filter_complex") + 1]
     assert "ass=" in graph
     assert "captions.ass" in graph
 
@@ -147,44 +152,33 @@ def test_ass_paths_with_colons_are_escaped(media, tmp_path):
     target = odd / "captions.ass"
     target.write_text(media["ass"].read_text(), encoding="utf-8")
 
-    graph = build_finish_command(_spec(media, tmp_path, ass_path=str(target)))[
-        build_finish_command(_spec(media, tmp_path, ass_path=str(target))).index(
-            "-filter_complex"
-        )
-        + 1
-    ]
+    cmd = build_finish_command(_spec(media, tmp_path, ass_path=str(target)))
+    graph = cmd[cmd.index("-filter_complex") + 1]
     assert "a\\:b" in graph
 
 
 def test_the_logo_is_overlaid_for_the_whole_runtime(media, tmp_path):
-    graph = build_finish_command(_spec(media, tmp_path))[
-        build_finish_command(_spec(media, tmp_path)).index("-filter_complex") + 1
-    ]
+    cmd = build_finish_command(_spec(media, tmp_path))
+    graph = cmd[cmd.index("-filter_complex") + 1]
     assert "overlay=" in graph
 
 
 def test_the_end_card_band_is_drawn_only_after_vo_end(media, tmp_path):
-    graph = build_finish_command(_spec(media, tmp_path, vo_end=4.0, card_duration=2.0))[
-        build_finish_command(_spec(media, tmp_path, vo_end=4.0, card_duration=2.0)).index(
-            "-filter_complex"
-        )
-        + 1
-    ]
+    cmd = build_finish_command(_spec(media, tmp_path, vo_end=4.0, card_duration=2.0))
+    graph = cmd[cmd.index("-filter_complex") + 1]
     assert "drawbox" in graph
     assert "between(t,4.000,6.000)" in graph
 
 
 def test_music_is_ducked_under_the_voiceover(media, tmp_path):
-    graph = build_finish_command(_spec(media, tmp_path))[
-        build_finish_command(_spec(media, tmp_path)).index("-filter_complex") + 1
-    ]
+    cmd = build_finish_command(_spec(media, tmp_path))
+    graph = cmd[cmd.index("-filter_complex") + 1]
     assert "amix=inputs=2" in graph
 
 
 def test_loudness_normalisation_targets_paid_social(media, tmp_path):
-    graph = build_finish_command(_spec(media, tmp_path))[
-        build_finish_command(_spec(media, tmp_path)).index("-filter_complex") + 1
-    ]
+    cmd = build_finish_command(_spec(media, tmp_path))
+    graph = cmd[cmd.index("-filter_complex") + 1]
     assert "loudnorm=I=-14" in graph
 
 

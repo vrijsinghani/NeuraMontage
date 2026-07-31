@@ -1712,6 +1712,7 @@ class VideoCompose(BaseTool):
             FinishStackError,
             FinishStackSpec,
             build_finish_command,
+            final_duration,
         )
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1738,7 +1739,7 @@ class VideoCompose(BaseTool):
             "operation": "render",
             "render_runtime": "ffmpeg",
             "finish_stack": True,
-            "final_duration": spec.vo_end + spec.card_duration,
+            "final_duration": final_duration(spec.vo_end, spec.card_duration),
             "output": str(output_path),
             "final_review": final_review,
             "final_review_status": final_review["status"],

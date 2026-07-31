@@ -168,6 +168,19 @@ def _audio_chain(spec: FinishStackSpec, total: float, vo_index: int, music_index
     return chain
 
 
+def _add_input(
+    cmd: list[str],
+    index: int,
+    path: Optional[Path],
+    *pre_args: str,
+) -> tuple[Optional[int], int]:
+    """Append an optional `-i` input and return (input_index, next_index)."""
+    if path is None:
+        return None, index
+    cmd.extend([*pre_args, "-i", str(path)])
+    return index, index + 1
+
+
 def build_finish_command(spec: FinishStackSpec) -> list[str]:
     """Build the ffmpeg command for the finish mux.
 
@@ -192,22 +205,10 @@ def build_finish_command(spec: FinishStackSpec) -> list[str]:
 
     cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(video)]
     index = 1
-    if logo is not None:
-        cmd.extend(["-i", str(logo)])
-        logo_index, index = index, index + 1
-    else:
-        logo_index = None
-    if vo is not None:
-        cmd.extend(["-i", str(vo)])
-        vo_index, index = index, index + 1
-    else:
-        vo_index = None
-    if music is not None:
-        # Loop so a short bed still covers the full runtime.
-        cmd.extend(["-stream_loop", "-1", "-i", str(music)])
-        music_index, index = index, index + 1
-    else:
-        music_index = None
+    logo_index, index = _add_input(cmd, index, logo)
+    vo_index, index = _add_input(cmd, index, vo)
+    # Loop so a short bed still covers the full runtime.
+    music_index, index = _add_input(cmd, index, music, "-stream_loop", "-1")
 
     graph = _video_chain(spec, total, logo_index is not None)
     graph += _audio_chain(spec, total, vo_index, music_index)

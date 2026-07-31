@@ -30,6 +30,9 @@ from tools.subtitle._ass import (
     style_line,
     styles_block,
 )
+# Single source of truth for the band height: the compose finish stack draws
+# it, this tool only needs to avoid placing text inside it.
+from tools.video._finish_stack import ENDCARD_BAND_HEIGHT
 
 DEFAULT_FRAME = {"width": 720, "height": 1280, "max_caption_width": 680, "safe_zone_y": [430, 830]}
 DEFAULT_CAPTIONS = {
@@ -44,9 +47,6 @@ DEFAULT_CAPTIONS = {
 }
 DEFAULT_FONTS = {"display": "Anton", "narration": "Montserrat ExtraBold", "body": "Montserrat"}
 DEFAULT_COLORS = {"accent": "#72bf44", "text": "#ffffff", "background": "#151515"}
-
-# The end card sits in the lower band the compose filter draws behind it.
-ENDCARD_BAND_HEIGHT = 340
 
 
 def _normalize(token: str) -> str:

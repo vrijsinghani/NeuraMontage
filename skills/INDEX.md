@@ -271,6 +271,26 @@ Stage director skills teach the agent HOW to execute each pipeline stage. Each s
 | Compose Director | `pipelines/localization-dub/compose-director.md` | `compose` | Per-locale rendering, subtitle-fit checks, output labeling |
 | Publish Director | `pipelines/localization-dub/publish-director.md` | `publish` | Locale packaging, metadata precision, QA-note retention |
 
+### Transformation Ad Pipeline (`pipelines/transformation-ad/`) — v0.1
+
+Ten stages, not the canonical eight: `assets` is split into gated `stills` and
+`motion` so no motion credits are spent against a plate the operator has not
+approved.
+
+| Skill | File | Stage | Key Capabilities |
+|-------|------|-------|-----------------|
+| **Executive Producer** | `pipelines/transformation-ad/executive-producer.md` | `all` | **10-stage orchestration, four operator gates, still-before-motion spend control** |
+| Research Director | `pipelines/transformation-ad/research-director.md` | `research` | Deep reference analysis, structure over frames, feasibility flags |
+| Proposal Director | `pipelines/transformation-ad/proposal-director.md` | `proposal` | 2-3 differentiated concepts, three-runtime presentation, `render_runtime_selection` |
+| Idea Director | `pipelines/transformation-ad/idea-director.md` | `idea` | State pair, action sequence, room anchors, narrative-state contract |
+| Script Director | `pipelines/transformation-ad/script-director.md` | `script` | Sound-off-first beats, brand-token integrity, beat-bounded narration |
+| Scene Director | `pipelines/transformation-ad/scene-director.md` | `scene_plan` | One action per shot, monotonic state progression, caption safe zones |
+| Stills Director | `pipelines/transformation-ad/stills-director.md` | `stills` | Seven-point still QC, quarantine on reject, gate before motion spend |
+| Motion Director | `pipelines/transformation-ad/motion-director.md` | `motion` | One-action prompt shape, unique-clip rule, recorded provider escalation |
+| Edit Director | `pipelines/transformation-ad/edit-director.md` | `edit` | Chronological assembly, clean-cut then VO-align, `vo_end` + `card_duration` handoff |
+| Compose Director | `pipelines/transformation-ad/compose-director.md` | `compose` | Runtime routing, single-pass ffmpeg finish stack, no `-shortest` |
+| Publish Director | `pipelines/transformation-ad/publish-director.md` | `publish` | Export package, payoff-state thumbnail, reject provenance |
+
 ## Meta Skills
 
 Cross-cutting skills that apply to all pipelines:
